@@ -2,44 +2,51 @@ import urllib.request
 import json
 import os
 
-board_id = input('GIB BOARD PLOX: ')
-thread_no = input('GIB THREAD NUMBER PLOX: ')
-directory = input('Choose save directory: ')
-
-def main():
-    json_url = 'http://api.4chan.org/{0}/res/{1}.json'.format(board_id,thread_no)
-
-    with urllib.request.urlopen(json_url) as html_response:
-        json_file = html_response.read().decode('utf-8')
-
-    print('Downloading all images from /{0}/{1}'.format(board_id,thread_no))
-    number_of_posts = len(json.loads(json_file)['posts'])
-    file_dir = '{2}\\{0}\\{1}\\'.format(board_id,thread_no,directory)
-   
-    if os.path.exists('{1}\\{0}\\'.format(board_id,directory)) == False:
-        os.mkdir('{1}\\{0}\\'.format(board_id,directory))
-    elif os.path.exists('{2}\\{0}\\{1}\\'.format(board_id,thread_no,directory)) == False:
-        os.mkdir('{2}\\{0}\\{1}\\'.format(board_id,thread_no,directory))
+input_dir = input('Save directory: ')
+print("")
     
-    i = 1
+def main():
+    #obtaining info from user
+    board_id = input('Board: ')
+    thread_no = input('Thread number: ')
+    
+    #obtaining json file
+    html_response = urllib.request.urlopen( 'http://api.4chan.org/{0}/res/{1}.json'.format(board_id, thread_no) )
+    posts = json.loads( html_response.read().decode('utf-8') )['posts']
 
-    for post in json.loads(json_file)['posts']:
+    #getting a list of image urls
+    image_names = []
+    total_download_size = 0
+    for post in posts:
+        if len(post) > 10:
+            image_names.append(str(post['tim'])+post['ext'])
+            total_download_size += post['fsize']
+        
+    total_download_size = round(total_download_size/(1024*1024),3)
+    
+    # directory shit
+    try:
+        thread_name = posts[0]["sub"].translate(str.maketrans({'\\':'','/':'','*':'','"':'','|':'','<':'','>':'','?':'',':':''}))
+    except KeyError:
+        thread_name = thread_no
+    
+    if os.path.exists(input_dir+"\\"+board_id+"\\"+thread_name) == False:
+        os.makedirs(input_dir+"\\"+board_id+"\\"+thread_name)
+    
+    #download shit
+    print('Downloading images from /{}/{} - Total: {} ({} MB)'.format(board_id, thread_no, len(image_names), str(total_download_size)))
+    i = 0
+    for image in image_names:
         i += 1
-        print('Post ({0}/{1}):'.format(i, number_of_posts+1))
-        try:
-            file_size = '{0} MB'.format(round(post['fsize']/(1024*1024),2))
-            print('Downloading image ({0}) ...'.format(file_size))
-            img_url = 'http://i.4cdn.org/{0}/{1}{2}'.format(board_id, post['tim'], post['ext'])
-            img_path = '{0}{1}{2}'.format(file_dir, post['tim'], post['ext'])
-            if os.path.isfile(img_path) == True:
-                print("    ... Image already downloaded.")
-            else:
-                with urllib.request.urlopen(img_url) as html_response:
-                    with open(img_path, 'wb') as img_file:
-                        img_file.write(html_response.read())
-                print('    ... Done.')
-        except KeyError:
-            print('    ... Encountered post with no image.')
-
-if __name__ == '__main__':
+        j = round(35*(i/len(image_names)))
+        image_url = 'http://i.4cdn.org/'+board_id+"/"+image
+        image_path = input_dir+"\\"+board_id+"\\"+thread_name+"\\"+image
+        if os.path.isfile(image_path) == False:
+            with urllib.request.urlopen(image_url) as html_response:
+                with open(image_path, 'wb') as image_file:
+                    image_file.write(html_response.read())
+            print("[" + j*"|" + (35-j)*"-" + "]" + " Done " + str(i) + " out of " + str(len(image_names)) +".", end='\r')
+    print("\n")   
+    
+while 1:
     main()
